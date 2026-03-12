@@ -15,8 +15,9 @@ class RoundService {
   /// Client HTTP — injectable pour les tests (MockClient), sinon client par défaut.
   final http.Client _client;
 
-  RoundService({String? baseUrl, this.authToken, http.Client? client})
+  RoundService({String? baseUrl, http.Client? client})
     : baseUrl = baseUrl ?? dotenv.env['API_URL'] ?? 'http://localhost:8080/api',
+      authToken = dotenv.env['AUTH_TOKEN'],
       _client = client ?? http.Client();
 
   /// En-têtes communs à toutes les requêtes.

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:citoyens_armes_app_mobile/Rounds/round_service.dart';
 
 // ---------------------------------------------------------------------------
@@ -35,11 +36,14 @@ RoundService _makeService(int statusCode, Object body) {
   return RoundService(baseUrl: 'http://localhost:9090/api', client: client);
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 void main() {
+  setUpAll(() async {
+    dotenv.testLoad(fileInput: '''
+API_URL=http://localhost:9090/api
+AUTH_TOKEN=test_token
+''');
+  });
+
   group('RoundService', () {
     // -----------------------------------------------------------------------
     // getRounds
