@@ -95,6 +95,8 @@ AUTH_TOKEN=test_token
         final round = await service.createRound(
           _tournamentId,
           'Quarts de finale',
+          3,
+          'test_token',
         );
 
         expect(round.id, _roundId);
@@ -117,6 +119,8 @@ AUTH_TOKEN=test_token
         final round = await service.createRound(
           _tournamentId,
           'Quarts de finale',
+          3,
+          'test_token',
         );
         expect(round.id, _roundId);
       });
@@ -124,7 +128,7 @@ AUTH_TOKEN=test_token
       test('lève une Exception si le serveur répond 500', () async {
         final service = _makeService(500, {'error': 'Erreur serveur'});
         expect(
-          () => service.createRound(_tournamentId, 'Finale'),
+          () => service.createRound(_tournamentId, 'Finale', 3, 'test_token'),
           throwsException,
         );
       });
