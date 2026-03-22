@@ -14,7 +14,7 @@ class EquipesPage extends StatefulWidget {
 class _EquipesPageState extends State<EquipesPage> {
   final EquipeController controller = EquipeController();
   
-  List<Equipe> equipes = []; // Liste source (toutes les équipes)
+  List<Equipe> equipes = []; // Liste source (toutes les équipe)
   List<Equipe> filteredEquipes = []; // Liste filtrée (ce qu'on affiche)
   List<Map<String, dynamic>> tournois = []; 
   

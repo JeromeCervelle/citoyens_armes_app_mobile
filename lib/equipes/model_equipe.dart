@@ -4,6 +4,7 @@ class Equipe {
   final int? points;
   final String? imageUrl;
 
+  //constructeur
   Equipe({
     this.id,
     required this.name,

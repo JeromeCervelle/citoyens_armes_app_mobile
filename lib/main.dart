@@ -19,7 +19,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
 
-      // Pour tester : mettre un tournamentId réel provenant de la liste déroulante
+      // Pour tester : mettre un tournamentId réel provenant de la liste
       home: const EquipesPage(tournamentId: ""),
     );
   }

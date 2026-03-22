@@ -6,7 +6,6 @@ import 'model_equipe.dart';
 class EquipeController {
   final String baseUrl = dotenv.env['API_URL']!;
   
-  // Ton token d'authentification
   final String token = "eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiJzdHJpbmciLCJpYXQiOjE3NzM2NDgzMzAsImV4cCI6MTc3MzczNDczMH0.KmaegxXamzpyT88i4Z0t3TaOVj-JoKI0HFSL3mbNlk6ezuDUNesjdpwpvgsf3QSqwlzUEGKTJQwGRTivRHyhHA";
 
   // Helper pour les headers (évite la répétition)
