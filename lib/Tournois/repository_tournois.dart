@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
@@ -119,7 +120,6 @@ class TournamentApiService {
     List<int>? formats,
   }) async {
     try {
-
       final teams = (await EquipeController().getEquipes(
         tournamentId,
       )).where((t) => !t.name.toUpperCase().contains('EXEMPT')).toList();
@@ -288,7 +288,6 @@ class TournamentApiService {
     List<int>? bracketFormats,
   }) async {
     try {
-
       final teams = (await EquipeController().getEquipes(
         tournamentId,
       )).where((t) => !t.name.toUpperCase().contains('EXEMPT')).toList();
@@ -485,8 +484,7 @@ class TournamentApiService {
           allMatches = await _matchService.getMatches(tournamentId);
         }
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   Future<bool> _isRoundFinished(
@@ -895,7 +893,6 @@ class TournamentApiService {
     return "";
   }
 
-
   /// Exécute une liste de fonctions asynchrones (factories) par vagues (chunks)
   /// pour Truly contrôler le départ des requêtes et ne pas saturer le serveur.
   /// Cette version est RÉSILIENTE : un échec d'une tâche n'arrête pas les autres.
@@ -948,5 +945,53 @@ class TournamentApiService {
       }
     }
     throw Exception("Échec après $retries tentatives");
+  }
+  /// [DEBUG] Crée automatiquement toutes les équipes manquantes pour le tournoi.
+  Future<void> debugCreateAllTeams(String tournamentId, int targetCount, String token) async {
+    final equipeController = EquipeController();
+    final existingTeams = await equipeController.getEquipes(tournamentId);
+    int createdCount = 0;
+    
+    for (int i = existingTeams.length; i < targetCount; i++) {
+      try {
+        await equipeController.createEquipe(tournamentId, Equipe(name: 'Team ${i + 1}'));
+        createdCount++;
+        // Petite pause pour éviter de saturer le serveur
+        await Future.delayed(const Duration(milliseconds: 100));
+      } catch (e) {
+        if (kDebugMode) print("Erreur création Team ${i + 1}: $e");
+      }
+    }
+    if (kDebugMode) print("Debug: $createdCount équipes créées.");
+  }
+
+  /// [DEBUG] Remplit des scores aléatoires pour tous les matchs de poule et avance le tournoi.
+  Future<void> debugFillPoolScores(String tournamentId, String token) async {
+    final rounds = await RoundService().getRounds(tournamentId);
+    final allMatches = await _matchService.getMatches(tournamentId);
+    final random = Random();
+
+    for (var round in rounds) {
+      if (round.name.startsWith('Poule')) {
+        for (var mId in round.matchIds) {
+          final mMatches = allMatches.where((m) => m.id == mId);
+          if (mMatches.isEmpty) continue;
+          final m = mMatches.first;
+
+          if (m.team1Id.isNotEmpty && m.team2Id.isNotEmpty) {
+            if (m.team1Point == 0 && m.team2Point == 0) {
+              int s1 = random.nextInt(5);
+              int s2 = random.nextInt(5);
+              if (s1 == s2) s1++;
+
+              await _matchService.updateMatchPoints(tournamentId, m.id, m.team1Id, s1, token);
+              await _matchService.updateMatchPoints(tournamentId, m.id, m.team2Id, s2, token);
+              await _matchService.updateMatchStatus(tournamentId, m.id, 'FINISHED', token);
+            }
+          }
+        }
+      }
+    }
+    await advanceTournament(tournamentId, token);
   }
 }

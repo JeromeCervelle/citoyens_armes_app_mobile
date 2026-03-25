@@ -21,11 +21,12 @@ class TournoisDetailView extends StatefulWidget {
   State<TournoisDetailView> createState() => _TournoisDetailViewState();
 }
 
-class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProviderStateMixin {
+class _TournoisDetailViewState extends State<TournoisDetailView>
+    with TickerProviderStateMixin {
   final UserService _userService = UserService();
   final TournamentApiService _apiService = TournamentApiService();
   final RoundService _roundService = RoundService();
-  
+
   late TabController _tabController;
   String _authToken = '';
   User? _currentUser;
@@ -41,7 +42,10 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
   void initState() {
     super.initState();
     _currentTournament = widget.tournament;
-    _tabController = TabController(length: 4, vsync: this); // Initial length, will be updated
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+    ); // Initial length, will be updated
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging && mounted) {
         setState(() {});
@@ -82,9 +86,16 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
 
   Future<void> _fetchRoundsCount() async {
     try {
-      final rounds = await _roundService.getRounds(_currentTournament.id, token: _authToken);
-      final hasPoules = rounds.any((r) => r.name.toUpperCase().startsWith('POULE'));
-      final hasBracket = rounds.any((r) => !r.name.toUpperCase().startsWith('POULE'));
+      final rounds = await _roundService.getRounds(
+        _currentTournament.id,
+        token: _authToken,
+      );
+      final hasPoules = rounds.any(
+        (r) => r.name.toUpperCase().startsWith('POULE'),
+      );
+      final hasBracket = rounds.any(
+        (r) => !r.name.toUpperCase().startsWith('POULE'),
+      );
       if (mounted) {
         setState(() {
           _roundsCount = rounds.length;
@@ -102,17 +113,39 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF0D1526),
-        title: const Text('CONFIRMER LA SUPPRESSION', style: TextStyle(color: Color(0xFF00FF85), fontWeight: FontWeight.bold, fontSize: 16)),
-        content: Text('Voulez-vous vraiment supprimer le tournoi "${_currentTournament.name}" ?', style: const TextStyle(color: Colors.white70)),
+        title: const Text(
+          'CONFIRMER LA SUPPRESSION',
+          style: TextStyle(
+            color: Color(0xFF00FF85),
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
+        content: Text(
+          'Voulez-vous vraiment supprimer le tournoi "${_currentTournament.name}" ?',
+          style: const TextStyle(color: Colors.white70),
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ANNULER', style: TextStyle(color: Colors.white54))),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              'ANNULER',
+              style: TextStyle(color: Colors.white54),
+            ),
+          ),
           TextButton(
             onPressed: () {
               final messenger = ScaffoldMessenger.of(context);
               Navigator.pop(context, true);
               _performDelete(messenger);
             },
-            child: const Text('SUPPRIMER', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+            child: const Text(
+              'SUPPRIMER',
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -139,7 +172,10 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
   void _navigateToEdit() async {
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => TournamentFormScreen(tournament: _currentTournament)),
+      MaterialPageRoute(
+        builder: (context) =>
+            TournamentFormScreen(tournament: _currentTournament),
+      ),
     );
     if (result == true) {
       setState(() => _dataChanged = true);
@@ -154,7 +190,14 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           backgroundColor: const Color(0xFF0D1526),
-          title: const Text('CHANGER LE STATUT', style: TextStyle(color: Color(0xFF00FF85), fontWeight: FontWeight.bold, fontSize: 16)),
+          title: const Text(
+            'CHANGER LE STATUT',
+            style: TextStyle(
+              color: Color(0xFF00FF85),
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
           content: DropdownButtonFormField<String>(
             value: currentStatus,
             dropdownColor: const Color(0xFF16213E),
@@ -162,8 +205,12 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
             decoration: const InputDecoration(
               labelText: 'Statut',
               labelStyle: TextStyle(color: Colors.white70),
-              enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-              focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF85))),
+              enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Colors.white24),
+              ),
+              focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: Color(0xFF00FF85)),
+              ),
             ),
             items: const [
               DropdownMenuItem(value: 'DRAFT', child: Text('Brouillon')),
@@ -175,7 +222,13 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
             onChanged: (val) => setDialogState(() => currentStatus = val!),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('ANNULER', style: TextStyle(color: Colors.white54))),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'ANNULER',
+                style: TextStyle(color: Colors.white54),
+              ),
+            ),
             TextButton(
               onPressed: () async {
                 final messenger = ScaffoldMessenger.of(context);
@@ -185,16 +238,29 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
                   _loadingMessage = 'Mis à jour du statut';
                 });
                 try {
-                  await _apiService.updateTournamentStatus(_currentTournament.id, currentStatus, _authToken);
+                  await _apiService.updateTournamentStatus(
+                    _currentTournament.id,
+                    currentStatus,
+                    _authToken,
+                  );
                   setState(() => _dataChanged = true);
                   await _refreshTournament();
                 } catch (e) {
-                  if (mounted) messenger.showSnackBar(SnackBar(content: Text('Erreur: $e')));
+                  if (mounted)
+                    messenger.showSnackBar(
+                      SnackBar(content: Text('Erreur: $e')),
+                    );
                 } finally {
                   if (mounted) setState(() => _isGenerating = false);
                 }
               },
-              child: const Text('VALIDER', style: TextStyle(color: Color(0xFF00FF85), fontWeight: FontWeight.bold)),
+              child: const Text(
+                'VALIDER',
+                style: TextStyle(
+                  color: Color(0xFF00FF85),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         ),
@@ -212,46 +278,85 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
-          int totalQualified = (int.tryParse(poolsController.text) ?? 0) * (int.tryParse(qualifiedController.text) ?? 0);
+          int totalQualified =
+              (int.tryParse(poolsController.text) ?? 0) *
+              (int.tryParse(qualifiedController.text) ?? 0);
           int nextPowerOf2 = Tournament.calculateNextPowerOf2(totalQualified);
           int bracketRounds = Tournament.calculateBracketRounds(totalQualified);
 
           if (bracketControllers.length != bracketRounds) {
             bracketControllers.clear();
-            for (int i = 0; i < bracketRounds; i++) bracketControllers[i] = TextEditingController(text: '1');
+            for (int i = 0; i < bracketRounds; i++)
+              bracketControllers[i] = TextEditingController(text: '1');
           }
 
           return AlertDialog(
             backgroundColor: const Color(0xFF0D1526),
-            title: const Text('POULES + ARBRE', style: TextStyle(color: Color(0xFF00FF85), fontWeight: FontWeight.bold, fontSize: 16)),
+            title: const Text(
+              'POULES + ARBRE',
+              style: TextStyle(
+                color: Color(0xFF00FF85),
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildNeonField(poolsController, 'Nombre de poules', (val) => setDialogState((){})),
-                  _buildNeonField(qualifiedController, 'Qualifiés par poule', (val) => setDialogState((){})),
+                  _buildNeonField(
+                    poolsController,
+                    'Nombre de poules',
+                    (val) => setDialogState(() {}),
+                  ),
+                  _buildNeonField(
+                    qualifiedController,
+                    'Qualifiés par poule',
+                    (val) => setDialogState(() {}),
+                  ),
                   _buildNeonField(poolBoController, 'Format Poules (BO)'),
                   if (bracketRounds > 0) ...[
                     const SizedBox(height: 24),
-                    const Text('FORMATS ARBRE (BO) :', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 12, letterSpacing: 1.1)),
+                    const Text(
+                      'FORMATS ARBRE (BO) :',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontSize: 12,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     ...List.generate(bracketRounds, (i) {
-                      String roundLabel = Tournament.getRoundLabel(nextPowerOf2 >> (i + 1));
-                      return _buildNeonField(bracketControllers[i]!, roundLabel);
+                      String roundLabel = Tournament.getRoundLabel(
+                        nextPowerOf2 >> (i + 1),
+                      );
+                      return _buildNeonField(
+                        bracketControllers[i]!,
+                        roundLabel,
+                      );
                     }),
-                  ]
+                  ],
                 ],
               ),
             ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context), child: const Text('ANNULER', style: TextStyle(color: Colors.white54))),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  'ANNULER',
+                  style: TextStyle(color: Colors.white54),
+                ),
+              ),
               TextButton(
                 onPressed: () async {
                   int p = int.tryParse(poolsController.text) ?? 2;
                   int q = int.tryParse(qualifiedController.text) ?? 2;
                   int pBo = int.tryParse(poolBoController.text) ?? 1;
-                  List<int> bFormats = bracketControllers.values.map((c) => int.tryParse(c.text) ?? 1).toList();
-                  
+                  List<int> bFormats = bracketControllers.values
+                      .map((c) => int.tryParse(c.text) ?? 1)
+                      .toList();
+
                   final messenger = ScaffoldMessenger.of(context);
                   Navigator.pop(context);
                   setState(() {
@@ -259,16 +364,32 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
                     _loadingMessage = 'Génération du tournoi';
                   });
                   try {
-                    await _apiService.generatePools(_currentTournament.id, p, q, _authToken, poolFormat: pBo, bracketFormats: bFormats);
+                    await _apiService.generatePools(
+                      _currentTournament.id,
+                      p,
+                      q,
+                      _authToken,
+                      poolFormat: pBo,
+                      bracketFormats: bFormats,
+                    );
                     setState(() => _dataChanged = true);
                     await _refreshTournament();
                   } catch (e) {
-                    if (mounted) messenger.showSnackBar(SnackBar(content: Text('Erreur: $e')));
+                    if (mounted)
+                      messenger.showSnackBar(
+                        SnackBar(content: Text('Erreur: $e')),
+                      );
                   } finally {
                     if (mounted) setState(() => _isGenerating = false);
                   }
                 },
-                child: const Text('GÉNÉRER', style: TextStyle(color: Color(0xFF00FF85), fontWeight: FontWeight.bold)),
+                child: const Text(
+                  'GÉNÉRER',
+                  style: TextStyle(
+                    color: Color(0xFF00FF85),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           );
@@ -278,46 +399,83 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
   }
 
   void _showGenerateBracketDialog() {
-    int nextPowerOf2 = Tournament.calculateNextPowerOf2(_currentTournament.numberOfTeams);
-    int totalRounds = Tournament.calculateBracketRounds(_currentTournament.numberOfTeams);
-    List<TextEditingController> controllers = List.generate(totalRounds, (_) => TextEditingController(text: '1'));
+    int nextPowerOf2 = Tournament.calculateNextPowerOf2(
+      _currentTournament.numberOfTeams,
+    );
+    int totalRounds = Tournament.calculateBracketRounds(
+      _currentTournament.numberOfTeams,
+    );
+    List<TextEditingController> controllers = List.generate(
+      totalRounds,
+      (_) => TextEditingController(text: '1'),
+    );
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF0D1526),
-        title: const Text('ARBRE DIRECT', style: TextStyle(color: Color(0xFF00FF85), fontWeight: FontWeight.bold, fontSize: 16)),
+        title: const Text(
+          'ARBRE DIRECT',
+          style: TextStyle(
+            color: Color(0xFF00FF85),
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+          ),
+        ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: List.generate(totalRounds, (i) {
-              String roundName = Tournament.getRoundLabel(nextPowerOf2 >> (i + 1));
+              String roundName = Tournament.getRoundLabel(
+                nextPowerOf2 >> (i + 1),
+              );
               return _buildNeonField(controllers[i], 'Format $roundName (BO)');
             }),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('ANNULER', style: TextStyle(color: Colors.white54))),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'ANNULER',
+              style: TextStyle(color: Colors.white54),
+            ),
+          ),
           TextButton(
             onPressed: () async {
-              List<int> formats = controllers.map((c) => int.tryParse(c.text) ?? 1).toList();
-              final messenger = ScaffoldMessenger.of(context); // Capture avant le pop
+              List<int> formats = controllers
+                  .map((c) => int.tryParse(c.text) ?? 1)
+                  .toList();
+              final messenger = ScaffoldMessenger.of(
+                context,
+              ); // Capture avant le pop
               Navigator.pop(context);
               setState(() {
                 _isGenerating = true;
                 _loadingMessage = 'Génération de l\'arbre';
               });
               try {
-                await _apiService.generateBracket(_currentTournament.id, _authToken, formats: formats);
+                await _apiService.generateBracket(
+                  _currentTournament.id,
+                  _authToken,
+                  formats: formats,
+                );
                 setState(() => _dataChanged = true);
                 await _refreshTournament();
               } catch (e) {
-                if (mounted) messenger.showSnackBar(SnackBar(content: Text('Erreur: $e')));
+                if (mounted)
+                  messenger.showSnackBar(SnackBar(content: Text('Erreur: $e')));
               } finally {
                 if (mounted) setState(() => _isGenerating = false);
               }
             },
-            child: const Text('GÉNÉRER', style: TextStyle(color: Color(0xFF00FF85), fontWeight: FontWeight.bold)),
+            child: const Text(
+              'GÉNÉRER',
+              style: TextStyle(
+                color: Color(0xFF00FF85),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -326,7 +484,8 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
 
   @override
   Widget build(BuildContext context) {
-    bool isAdmin = (_currentUser?.isAdmin == true) || (_currentUser?.isSuperAdmin == true);
+    bool isAdmin =
+        (_currentUser?.isAdmin == true) || (_currentUser?.isSuperAdmin == true);
 
     final List<Widget> tabs = [
       const Tab(text: 'Détails', icon: Icon(Icons.info_outline)),
@@ -343,14 +502,20 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
       const Tab(text: 'Rounds', icon: Icon(Icons.layers)),
     ]);
 
-    final List<Widget> tabViews = [
-      _buildInfoTab(),
-    ];
+    final List<Widget> tabViews = [_buildInfoTab(isAdmin)];
     if (_hasPoules) {
-      tabViews.add(RoundsListView(tournament: _currentTournament, isPoulesOnly: true, isAdmin: isAdmin));
+      tabViews.add(
+        RoundsListView(
+          tournament: _currentTournament,
+          isPoulesOnly: true,
+          isAdmin: isAdmin,
+        ),
+      );
     }
     if (_hasBracket) {
-      tabViews.add(BracketView(tournament: _currentTournament, isAdmin: isAdmin));
+      tabViews.add(
+        BracketView(tournament: _currentTournament, isAdmin: isAdmin),
+      );
     }
     tabViews.addAll([
       EquipesListView(tournament: _currentTournament, isAdmin: isAdmin),
@@ -362,13 +527,17 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
 
     // Update tab controller if length changed
     if (_tabController.length != tabs.length) {
-       _tabController.dispose();
-       _tabController = TabController(length: tabs.length, vsync: this, initialIndex: 0);
-       _tabController.addListener(() {
-         if (!_tabController.indexIsChanging && mounted) {
-           setState(() {});
-         }
-       });
+      _tabController.dispose();
+      _tabController = TabController(
+        length: tabs.length,
+        vsync: this,
+        initialIndex: 0,
+      );
+      _tabController.addListener(() {
+        if (!_tabController.indexIsChanging && mounted) {
+          setState(() {});
+        }
+      });
     }
 
     final scaffoldBody = Stack(
@@ -376,9 +545,22 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
         const NeonBackground(),
         Scaffold(
           backgroundColor: Colors.transparent,
-          floatingActionButton: (isAdmin && _roundsCount == 0 && !_isGenerating && _tabController.index != teamsTabIndex) ? _buildFab() : null,
+          floatingActionButton:
+              (isAdmin &&
+                  _roundsCount == 0 &&
+                  !_isGenerating &&
+                  _tabController.index != teamsTabIndex)
+              ? _buildFab()
+              : null,
           appBar: AppBar(
-            title: Text(_currentTournament.name.toUpperCase(), style: const TextStyle(color: Color(0xFF00FF85), fontWeight: FontWeight.bold, letterSpacing: 1.2)),
+            title: Text(
+              _currentTournament.name.toUpperCase(),
+              style: const TextStyle(
+                color: Color(0xFF00FF85),
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+              ),
+            ),
             backgroundColor: Colors.transparent,
             elevation: 0,
             iconTheme: const IconThemeData(color: Colors.white),
@@ -393,23 +575,92 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
                   icon: const Icon(Icons.more_vert, color: Colors.white),
                   onSelected: (value) {
                     switch (value) {
-                      case 'edit': _navigateToEdit(); break;
-                      case 'status': _showTournamentStatusDialog(); break;
-                      case 'pools': _showGeneratePoolsDialog(); break;
-                      case 'bracket': _showGenerateBracketDialog(); break;
-                      case 'delete': _deleteTournament(); break;
+                      case 'edit':
+                        _navigateToEdit();
+                        break;
+                      case 'status':
+                        _showTournamentStatusDialog();
+                        break;
+                      case 'pools':
+                        _showGeneratePoolsDialog();
+                        break;
+                      case 'bracket':
+                        _showGenerateBracketDialog();
+                        break;
+                      case 'delete':
+                        _deleteTournament();
+                        break;
                     }
                   },
                   itemBuilder: (context) => [
-                    const PopupMenuItem(value: 'edit', child: ListTile(leading: Icon(Icons.edit, color: Colors.blue), title: Text('Éditer Tournoi', style: TextStyle(color: Colors.white)), contentPadding: EdgeInsets.zero)),
-                    const PopupMenuItem(value: 'status', child: ListTile(leading: Icon(Icons.compare_arrows, color: Colors.orange), title: Text('Changer Statut', style: TextStyle(color: Colors.white)), contentPadding: EdgeInsets.zero)),
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: ListTile(
+                        leading: Icon(Icons.edit, color: Colors.blue),
+                        title: Text(
+                          'Éditer Tournoi',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'status',
+                      child: ListTile(
+                        leading: Icon(
+                          Icons.compare_arrows,
+                          color: Colors.orange,
+                        ),
+                        title: Text(
+                          'Changer Statut',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
                     if (_roundsCount == 0) ...[
                       const PopupMenuDivider(),
-                      const PopupMenuItem(value: 'pools', child: ListTile(leading: Icon(Icons.grid_on, color: Color(0xFF00FF85)), title: Text('Générer Poules + Arbre', style: TextStyle(color: Colors.white)), contentPadding: EdgeInsets.zero)),
-                      const PopupMenuItem(value: 'bracket', child: ListTile(leading: Icon(Icons.account_tree, color: Colors.purpleAccent), title: Text('Générer Arbre direct', style: TextStyle(color: Colors.white)), contentPadding: EdgeInsets.zero)),
+                      const PopupMenuItem(
+                        value: 'pools',
+                        child: ListTile(
+                          leading: Icon(
+                            Icons.grid_on,
+                            color: Color(0xFF00FF85),
+                          ),
+                          title: Text(
+                            'Générer Poules + Arbre',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'bracket',
+                        child: ListTile(
+                          leading: Icon(
+                            Icons.account_tree,
+                            color: Colors.purpleAccent,
+                          ),
+                          title: Text(
+                            'Générer Arbre direct',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
                     ],
                     const PopupMenuDivider(),
-                    const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete, color: Colors.redAccent), title: Text('Supprimer', style: TextStyle(color: Colors.redAccent)), contentPadding: EdgeInsets.zero)),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: ListTile(
+                        leading: Icon(Icons.delete, color: Colors.redAccent),
+                        title: Text(
+                          'Supprimer',
+                          style: TextStyle(color: Colors.redAccent),
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ),
                   ],
                 ),
             ],
@@ -424,7 +675,7 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
           ),
           body: TabBarView(
             controller: _tabController,
-            physics: const NeverScrollableScrollPhysics(), 
+            physics: const NeverScrollableScrollPhysics(),
             children: tabViews,
           ),
         ),
@@ -438,55 +689,58 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
                 child: Material(
                   color: Colors.transparent,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0D1526),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFF00FF85).withOpacity(0.4), width: 1.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF00FF85).withOpacity(0.15),
-                        blurRadius: 30,
-                        spreadRadius: 5,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 40,
+                      vertical: 32,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0D1526),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFF00FF85).withOpacity(0.4),
+                        width: 1.5,
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const SizedBox(
-                        width: 52,
-                        height: 52,
-                        child: CircularProgressIndicator(
-                          color: Color(0xFF00FF85),
-                          strokeWidth: 3,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF00FF85).withOpacity(0.15),
+                          blurRadius: 30,
+                          spreadRadius: 5,
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      Text(
-                        _loadingMessage.toUpperCase(),
-                        style: TextStyle(
-                          color: Color(0xFF00FF85),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          letterSpacing: 2,
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const SizedBox(
+                          width: 52,
+                          height: 52,
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF00FF85),
+                            strokeWidth: 3,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Veuillez patienter...',
-                        style: TextStyle(
-                          color: Colors.white54,
-                          fontSize: 13,
+                        const SizedBox(height: 24),
+                        Text(
+                          _loadingMessage.toUpperCase(),
+                          style: TextStyle(
+                            color: Color(0xFF00FF85),
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            letterSpacing: 2,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Veuillez patienter...',
+                          style: TextStyle(color: Colors.white54, fontSize: 13),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
       ],
     );
 
@@ -494,7 +748,7 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
       canPop: true,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop && result == null && _dataChanged) {
-          // Handled by return value of Navigator.pop if needed, 
+          // Handled by return value of Navigator.pop if needed,
           // but DashboardView uses .then((_) => refresh) which catches everything.
         }
       },
@@ -502,7 +756,7 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
     );
   }
 
-  Widget _buildInfoTab() {
+  Widget _buildInfoTab(bool isAdmin) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -512,7 +766,10 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
             children: [
               const Icon(Icons.gamepad, color: Color(0xFF00FF85)),
               const SizedBox(width: 12),
-              Text('Jeu: ${_currentTournament.game}', style: const TextStyle(fontSize: 18, color: Colors.white)),
+              Text(
+                'Jeu: ${_currentTournament.game}',
+                style: const TextStyle(fontSize: 18, color: Colors.white),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -520,7 +777,10 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
             children: [
               const Icon(Icons.info, color: Color(0xFF00FF85)),
               const SizedBox(width: 12),
-              Text('Statut: ${_currentTournament.status}', style: const TextStyle(fontSize: 18, color: Colors.white)),
+              Text(
+                'Statut: ${_currentTournament.status}',
+                style: const TextStyle(fontSize: 18, color: Colors.white),
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -528,17 +788,104 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
             children: [
               const Icon(Icons.group, color: Color(0xFF00FF85)),
               const SizedBox(width: 12),
-              Text('Nombre d\'équipes: ${_currentTournament.numberOfTeams}', style: const TextStyle(fontSize: 18, color: Colors.white)),
+              Text(
+                'Nombre d\'équipes: ${_currentTournament.numberOfTeams}',
+                style: const TextStyle(fontSize: 18, color: Colors.white),
+              ),
             ],
           ),
           const SizedBox(height: 32),
-          const SizedBox(height: 32),
-          const Text('Instructions rapides :', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF00FF85))),
-          const SizedBox(height: 8),
-          const Text('- Utilisez l\'onglet Équipes pour consulter les inscrits.', style: TextStyle(color: Colors.white70)),
-          const Text('- Utilisez l\'onglet Poules et Arbre pour naviguer visuellement.', style: TextStyle(color: Colors.white70)),
-          const Text('- Tapez sur un Round ou une Équipe pour filtrer les matchs associés.', style: TextStyle(color: Colors.white70)),
+          if (isAdmin) ...[
+            const SizedBox(height: 48),
+            const Text(
+              'ZONE DE DÉBOGAGE (ADMIN ONLY) :',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Colors.orangeAccent,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                _buildDebugBtn(
+                  'Auto-remplir Équipes',
+                  Icons.group_add,
+                  Colors.blue,
+                  () => _handleDebugAction(
+                    () => _apiService.debugCreateAllTeams(
+                      _currentTournament.id,
+                      _currentTournament.numberOfTeams,
+                      _authToken,
+                    ),
+                    'Équipes créées avec succès',
+                  ),
+                ),
+                _buildDebugBtn(
+                  'Auto-scores Poules',
+                  Icons.casino,
+                  Colors.orange,
+                  () => _handleDebugAction(
+                    () => _apiService.debugFillPoolScores(
+                      _currentTournament.id,
+                      _authToken,
+                    ),
+                    'Scores de poules remplis',
+                  ),
+                ),
+                _buildDebugBtn(
+                  'Stats Scoreboard',
+                  Icons.refresh,
+                  Colors.green,
+                  _refreshTournament,
+                ),
+              ],
+            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  Future<void> _handleDebugAction(
+    Future<void> Function() action,
+    String successMessage,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() {
+      _isGenerating = true;
+      _loadingMessage = 'Action debug en cours';
+    });
+    try {
+      await action();
+      setState(() => _dataChanged = true);
+      await _refreshTournament();
+      if (mounted) messenger.showSnackBar(SnackBar(content: Text(successMessage)));
+    } catch (e) {
+      if (mounted) messenger.showSnackBar(SnackBar(content: Text('Erreur: $e')));
+    } finally {
+      if (mounted) setState(() => _isGenerating = false);
+    }
+  }
+
+  Widget _buildDebugBtn(
+    String label,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return ElevatedButton.icon(
+      onPressed: _isGenerating ? null : onTap,
+      icon: Icon(icon, size: 18),
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color.withOpacity(0.15),
+        foregroundColor: color,
+        side: BorderSide(color: color.withOpacity(0.5)),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       ),
     );
   }
@@ -550,10 +897,7 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
       icon: const Icon(Icons.bolt, color: Colors.white),
       label: const Text(
         'Générer le tournoi',
-        style: TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-        ),
+        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
       ),
     );
   }
@@ -574,22 +918,42 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
           children: [
             const Text(
               'OPTIONS DE GÉNÉRATION',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF00FF85), letterSpacing: 1.2),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF00FF85),
+                letterSpacing: 1.2,
+              ),
             ),
             const SizedBox(height: 16),
             ListTile(
               leading: const Icon(Icons.grid_on, color: Color(0xFF00FF85)),
-              title: const Text('Poules + Arbre final', style: TextStyle(color: Colors.white)),
-              subtitle: const Text('Répartit les équipes en groupes', style: TextStyle(color: Colors.white54)),
+              title: const Text(
+                'Poules + Arbre final',
+                style: TextStyle(color: Colors.white),
+              ),
+              subtitle: const Text(
+                'Répartit les équipes en groupes',
+                style: TextStyle(color: Colors.white54),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 _showGeneratePoolsDialog();
               },
             ),
             ListTile(
-              leading: const Icon(Icons.account_tree, color: Colors.purpleAccent),
-              title: const Text('Arbre direct', style: TextStyle(color: Colors.white)),
-              subtitle: const Text('Élimination directe immédiate', style: TextStyle(color: Colors.white54)),
+              leading: const Icon(
+                Icons.account_tree,
+                color: Colors.purpleAccent,
+              ),
+              title: const Text(
+                'Arbre direct',
+                style: TextStyle(color: Colors.white),
+              ),
+              subtitle: const Text(
+                'Élimination directe immédiate',
+                style: TextStyle(color: Colors.white54),
+              ),
               onTap: () {
                 Navigator.pop(context);
                 _showGenerateBracketDialog();
@@ -602,8 +966,11 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
     );
   }
 
-  
-  Widget _buildNeonField(TextEditingController controller, String label, [Function(String)? onChanged]) {
+  Widget _buildNeonField(
+    TextEditingController controller,
+    String label, [
+    Function(String)? onChanged,
+  ]) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: TextField(
@@ -614,8 +981,12 @@ class _TournoisDetailViewState extends State<TournoisDetailView> with TickerProv
         decoration: InputDecoration(
           labelText: label,
           labelStyle: const TextStyle(color: Colors.white54, fontSize: 13),
-          enabledBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
-          focusedBorder: const UnderlineInputBorder(borderSide: BorderSide(color: Color(0xFF00FF85))),
+          enabledBorder: const UnderlineInputBorder(
+            borderSide: BorderSide(color: Colors.white24),
+          ),
+          focusedBorder: const UnderlineInputBorder(
+            borderSide: BorderSide(color: Color(0xFF00FF85)),
+          ),
         ),
       ),
     );
