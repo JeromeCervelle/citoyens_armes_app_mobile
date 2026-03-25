@@ -406,12 +406,12 @@ class TournamentApiService {
     String roundId,
     String token,
   ) async {
-    // Mise à jour des points
-    await _matchService.updateMatchPoints(tournamentId, matchId, t1, s1, token);
-    await _matchService.updateMatchPoints(tournamentId, matchId, t2, s2, token);
-
-    // Mise à jour du statut
-    await _matchService.updateMatchStatus(tournamentId, matchId, status, token);
+    // PARALLÉLISATION : Mise à jour des points et du statut simultanément
+    await Future.wait([
+      _matchService.updateMatchPoints(tournamentId, matchId, t1, s1, token),
+      _matchService.updateMatchPoints(tournamentId, matchId, t2, s2, token),
+      _matchService.updateMatchStatus(tournamentId, matchId, status, token),
+    ]);
 
     // Avancement automatique si terminé
     if (status == 'FINISHED') {
@@ -436,26 +436,19 @@ class TournamentApiService {
             .toList();
 
         // Check if round needs to expand its BO series
-        await _isRoundFinished(tournamentId, round, matches, token, byeIds);
+        final roundResult = await _isRoundFinished(tournamentId, round, matches, token, byeIds);
+        if (roundResult.hasChanged) {
+          allMatches = await _matchService.getMatches(tournamentId);
+        }
 
         // Stream Advancement: Try to push winners to the next round immediately
         if (round.name.startsWith('Poule')) {
-          if (await _isRoundFinished(
-            tournamentId,
-            round,
-            matches,
-            token,
-            byeIds,
-          )) {
+          if (roundResult.isFinished) {
             bool allPoolsDone = true;
             for (var r in rounds.where((r) => r.name.startsWith('Poule'))) {
-              if (!(await _isRoundFinished(
-                tournamentId,
-                r,
-                allMatches.where((m) => r.matchIds.contains(m.id)).toList(),
-                token,
-                byeIds,
-              ))) {
+              final prMatches = allMatches.where((m) => r.matchIds.contains(m.id)).toList();
+              final prResult = await _isRoundFinished(tournamentId, r, prMatches, token, byeIds);
+              if (!prResult.isFinished) {
                 allPoolsDone = false;
                 break;
               }
@@ -472,7 +465,7 @@ class TournamentApiService {
             }
           }
         } else if (i + 1 < rounds.length) {
-          await _advanceWinnersToNextRound(
+          bool advanced = await _advanceWinnersToNextRound(
             tournamentId,
             round,
             rounds[i + 1],
@@ -480,14 +473,16 @@ class TournamentApiService {
             token,
             byeIds,
           );
-          // REFRESH matches to pick up the winners pushed to the next round
-          allMatches = await _matchService.getMatches(tournamentId);
+          // OPTIMISATION : On ne recharge les matchs que si un vainqueur a été poussé
+          if (advanced) {
+            allMatches = await _matchService.getMatches(tournamentId);
+          }
         }
       }
     } catch (e) {}
   }
 
-  Future<bool> _isRoundFinished(
+  Future<({bool isFinished, bool hasChanged})> _isRoundFinished(
     String tournamentId,
     Round r,
     List<dynamic> matches,
@@ -503,52 +498,68 @@ class TournamentApiService {
       groups.putIfAbsent(k, () => []).add(m);
     }
 
-    if (groups.isEmpty) return false;
+    if (groups.isEmpty) return (isFinished: false, hasChanged: false);
 
     int needed = (r.format ~/ 2) + 1;
     bool allDone = true;
+    bool hasChanged = false;
+
+    // Collecter les tâches de création de matchs pour les séries BO
+    final List<Future Function()> expansionFactories = [];
 
     for (var s in groups.values) {
-      int w1 = s
-          .where((m) => m.status == 'FINISHED' && m.team1Point > m.team2Point)
-          .length;
-      int w2 = s
-          .where((m) => m.status == 'FINISHED' && m.team2Point > m.team1Point)
-          .length;
+      String t1 = s[0].team1Id;
+      int wA = 0;
+      int wB = 0;
+      for (var m in s) {
+        if (m.status != 'FINISHED') continue;
+        bool swapped = m.team1Id != t1;
+        int s1 = swapped ? m.team2Point : m.team1Point;
+        int s2 = swapped ? m.team1Point : m.team2Point;
+        if (s1 > s2)
+          wA++;
+        else if (s2 > s1) wB++;
+      }
 
       bool containsExemption = s.any(
         (m) => byeIds.contains(m.team1Id) || byeIds.contains(m.team2Id),
       );
       bool isTbd = s.any((m) => m.team1Id.isEmpty || m.team2Id.isEmpty);
 
-      if (containsExemption || isTbd || w1 >= needed || w2 >= needed) {
+      if (containsExemption || isTbd || wA >= needed || wB >= needed) {
         continue;
       }
 
       allDone = false;
 
+      // Si tous les matchs actuels sont finis mais que personne n'a gagné la série (BO)
       if (s.every((m) => m.status == 'FINISHED') && s.length < r.format) {
-        try {
-          final next = await _matchService.createMatch(
-            tournamentId,
-            r.id,
-            token,
-          );
-          if (next != null && next['id'] != null) {
-            await _matchService.registerTeamsToMatch(
-              tournamentId,
-              next['id'],
-              s[0].team1Id,
-              s[0].team2Id,
-              token,
-            );
+        expansionFactories.add(() async {
+          try {
+            final next = await _matchService.createMatch(tournamentId, r.id, token);
+            if (next != null && next['id'] != null) {
+              await _matchService.registerTeamsToMatch(
+                tournamentId,
+                next['id'],
+                s[0].team1Id,
+                s[0].team2Id,
+                token,
+              );
+              hasChanged = true;
+            }
+          } catch (e) {
+            print("Erreur création match BO: $e");
           }
-        } catch (e) {
-          print("Erreur création match BO: $e");
-        }
+        });
       }
     }
-    return allDone;
+
+    if (expansionFactories.isNotEmpty) {
+      // Exécuter les créations de matchs BO en parallèle/chunks
+      await _chunkedFutureWait(expansionFactories, chunkSize: 5);
+    }
+
+    return (isFinished: allDone, hasChanged: hasChanged);
   }
 
   Future<void> _resolvePoolsAndSeedBracket(
@@ -770,7 +781,7 @@ class TournamentApiService {
     return (names[a] ?? '').compareTo(names[b] ?? '');
   }
 
-  Future<void> _advanceWinnersToNextRound(
+  Future<bool> _advanceWinnersToNextRound(
     String tId,
     Round curr,
     Round next,
@@ -778,6 +789,9 @@ class TournamentApiService {
     String token,
     Set<String> byeIds,
   ) async {
+    bool hasChanged = false;
+    final List<Future Function()> registrationTasks = [];
+
     try {
       for (int i = 0; i < next.matchIds.length; i++) {
         final pos1 = 2 * i;
@@ -787,48 +801,45 @@ class TournamentApiService {
         final m1 = _findMatchById(all, curr.matchIds[pos1]);
         final m2 = _findMatchById(all, curr.matchIds[pos2]);
 
-        if (m1 == null || m2 == null) {
-          print(
-            "DEBUG: Round ${curr.name} slot $i: UN MATCH PARENT EST NULL (M1: $m1, M2: $m2)",
-          );
-          break;
-        }
-
-        print(
-          "DEBUG: Slot $i pairing: Match ${m1.id} (T1: ${m1.team1Id}, T2: ${m1.team2Id}) v Match ${m2.id} (T1: ${m2.team1Id}, T2: ${m2.team2Id})",
-        );
+        if (m1 == null || m2 == null) break;
 
         String w1 = _getSeriesWinner(m1, all, curr, byeIds);
         String w2 = _getSeriesWinner(m2, all, curr, byeIds);
 
-        print("DEBUG: Round ${curr.name} slot $i: W1='$w1', W2='$w2'");
-
         if (w1.isNotEmpty && w2.isNotEmpty) {
-          // GARDE IDEMPOTENCE : On ne réinscrit pas si le match suivant a déjà des équipes.
           final nextMatch = _findMatchById(all, next.matchIds[i]);
           if (nextMatch != null &&
               nextMatch.team1Id.isNotEmpty &&
               nextMatch.team2Id.isNotEmpty) {
-            continue; // Match déjà seédé, ne pas écraser
+            continue;
           }
 
-          print("DEBUG: Match ${next.matchIds[i]} rempli avec $w1 et $w2");
-          await _matchService.registerTeamsToMatch(
-            tId,
-            next.matchIds[i],
-            w1,
-            w2,
-            token,
-          );
-        } else if (w1.isNotEmpty || w2.isNotEmpty) {
-          print(
-            "DEBUG: Round suivant - attente du deuxième vainqueur pour ${next.matchIds[i]} (W1: '$w1', W2: '$w2')",
-          );
+          // Préparer la tâche d'inscription pour exécution parallèle
+          registrationTasks.add(() async {
+            try {
+              await _matchService.registerTeamsToMatch(
+                tId,
+                next.matchIds[i],
+                w1,
+                w2,
+                token,
+              );
+              hasChanged = true;
+            } catch (e) {
+              print("Erreur inscription équipe: $e");
+            }
+          });
         }
+      }
+
+      if (registrationTasks.isNotEmpty) {
+        // Exécuter toutes les inscriptions du round en parallèle (par chunks de 10)
+        await _chunkedFutureWait(registrationTasks, chunkSize: 10);
       }
     } catch (e) {
       print("Erreur progression: $e");
     }
+    return hasChanged;
   }
 
   dynamic _findMatchById(List<dynamic> all, String id) {
@@ -854,8 +865,9 @@ class TournamentApiService {
     final series = allMatches
         .where(
           (m) =>
+              round.matchIds.contains(m.id) &&
               ((m.team1Id == t1 && m.team2Id == t2) ||
-              (m.team1Id == t2 && m.team2Id == t1)),
+                  (m.team1Id == t2 && m.team2Id == t1)),
         )
         .toList();
 
