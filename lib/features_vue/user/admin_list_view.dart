@@ -34,10 +34,18 @@ class _AdminListViewState extends State<AdminListView> {
   Future<void> _refresh() async {
     setState(() => _isLoading = true);
     try {
-      final users = await _userService.getAllUsers(includeInactive: _showInactive);
+      final me = await _userService.getCurrentUser();
+      List<User> users;
+      if (me?.isSuperAdmin == true) {
+        users = await _userService.getAllUsers(includeInactive: _showInactive);
+      } else {
+        // Un Admin simple ne voit que son propre profil
+        users = me != null ? [me] : [];
+      }
       setState(() {
         _users = users;
         _isLoading = false;
+        _currentUserId = me?.id;
       });
     } catch (e) {
       setState(() => _isLoading = false);
@@ -130,10 +138,7 @@ class _AdminListViewState extends State<AdminListView> {
   }
 
   Future<void> _showEditUserDialog(User user) async {
-    if (_isSelf(user)) {
-      _showError('Vous ne pouvez pas modifier votre propre profil ici.');
-      return;
-    }
+    final isSelf = _isSelf(user);
     final nameController = TextEditingController(text: user.name);
     final emailController = TextEditingController(text: user.email);
     String selectedRole = user.role ?? 'ADMIN';
@@ -158,10 +163,12 @@ class _AdminListViewState extends State<AdminListView> {
               children: [
                 _buildNeonField(nameController, 'Nom'),
                 _buildNeonField(emailController, 'Email'),
-                const Divider(color: Colors.white24, height: 24),
-                const Text('RÔLE', style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
-                _buildRoleRadio(setDialogState, 'ADMIN', selectedRole, (v) => selectedRole = v),
-                _buildRoleRadio(setDialogState, 'SUPERADMIN', selectedRole, (v) => selectedRole = v),
+                if (!isSelf) ...[
+                  const Divider(color: Colors.white24, height: 24),
+                  const Text('RÔLE', style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
+                  _buildRoleRadio(setDialogState, 'ADMIN', selectedRole, (v) => selectedRole = v),
+                  _buildRoleRadio(setDialogState, 'SUPERADMIN', selectedRole, (v) => selectedRole = v),
+                ],
               ],
             ),
           ),
@@ -331,9 +338,11 @@ class _AdminListViewState extends State<AdminListView> {
           Scaffold(
             backgroundColor: Colors.transparent,
             appBar: AppBar(
-              title: const Text(
-                'GESTION DES ADMINS',
-                style: TextStyle(
+              title: Text(
+                _users.any((u) => _isSelf(u) && u.isSuperAdmin) 
+                  ? 'GESTION DES ADMINS' 
+                  : 'MON PROFIL',
+                style: const TextStyle(
                   color: Color(0xFF00FF85),
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.2,
@@ -343,25 +352,28 @@ class _AdminListViewState extends State<AdminListView> {
               elevation: 0,
               iconTheme: const IconThemeData(color: Colors.white),
               actions: [
-                IconButton(
-                  icon: Icon(
-                    _showInactive ? Icons.visibility : Icons.visibility_off,
-                    color: _showInactive ? const Color(0xFF00FF85) : Colors.white54,
+                if (_users.any((u) => _isSelf(u) && u.isSuperAdmin))
+                  IconButton(
+                    icon: Icon(
+                      _showInactive ? Icons.visibility : Icons.visibility_off,
+                      color: _showInactive ? const Color(0xFF00FF85) : Colors.white54,
+                    ),
+                    onPressed: () {
+                      setState(() => _showInactive = !_showInactive);
+                      _refresh();
+                    },
+                    tooltip: _showInactive ? 'Masquer inactifs' : 'Afficher inactifs',
                   ),
-                  onPressed: () {
-                    setState(() => _showInactive = !_showInactive);
-                    _refresh();
-                  },
-                  tooltip: _showInactive ? 'Masquer inactifs' : 'Afficher inactifs',
-                ),
                 const SizedBox(width: 8),
               ],
             ),
-            floatingActionButton: FloatingActionButton(
-              onPressed: _showCreateUserDialog,
-              backgroundColor: const Color(0xFF00FF85),
-              child: const Icon(Icons.person_add, color: Colors.black),
-            ),
+            floatingActionButton: (_users.any((u) => _isSelf(u) && u.isSuperAdmin))
+                ? FloatingActionButton(
+                    onPressed: _showCreateUserDialog,
+                    backgroundColor: const Color(0xFF00FF85),
+                    child: const Icon(Icons.person_add, color: Colors.black),
+                  )
+                : null,
             body: _isLoading
                 ? const Center(
                     child: CircularProgressIndicator(color: Color(0xFF00FF85)),
@@ -487,36 +499,36 @@ class _AdminListViewState extends State<AdminListView> {
                     ],
                   ),
                 ),
-                if (!isSelf) ...[
-                   if (u.status == 'INACTIVE')
-                    IconButton(
-                      icon: const Icon(
-                        Icons.person_add_alt_1,
-                        color: Color(0xFF00FF85),
-                        size: 20,
-                      ),
-                      onPressed: () => _reactivateUser(u),
-                      tooltip: 'Réactiver',
-                    )
-                  else ...[
-                    IconButton(
-                      icon: const Icon(
-                        Icons.lock_reset,
-                        color: Colors.white38,
-                        size: 20,
-                      ),
-                      onPressed: () => _showChangePasswordDialog(u),
-                      tooltip: 'Changer le mot de passe',
+                if (u.status == 'INACTIVE')
+                  IconButton(
+                    icon: const Icon(
+                      Icons.person_add_alt_1,
+                      color: Color(0xFF00FF85),
+                      size: 20,
                     ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.manage_accounts,
-                        color: Colors.white54,
-                        size: 20,
-                      ),
-                      onPressed: () => _showEditUserDialog(u),
-                      tooltip: 'Modifier',
+                    onPressed: () => _reactivateUser(u),
+                    tooltip: 'Réactiver',
+                  )
+                else ...[
+                  IconButton(
+                    icon: const Icon(
+                      Icons.lock_reset,
+                      color: Colors.white38,
+                      size: 20,
                     ),
+                    onPressed: () => _showChangePasswordDialog(u),
+                    tooltip: 'Changer le mot de passe',
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.manage_accounts,
+                      color: Colors.white54,
+                      size: 20,
+                    ),
+                    onPressed: () => _showEditUserDialog(u),
+                    tooltip: 'Modifier',
+                  ),
+                  if (!isSelf)
                     IconButton(
                       icon: const Icon(
                         Icons.person_off_outlined,
@@ -525,10 +537,10 @@ class _AdminListViewState extends State<AdminListView> {
                       ),
                       onPressed: () => _confirmDelete(u),
                       tooltip: 'Désactiver',
-                    ),
-                  ],
-                ] else
-                  const SizedBox(width: 144), // placeholder augmenté pour aligner
+                    )
+                  else
+                    const SizedBox(width: 48),
+                ],
               ],
             ),
           ),

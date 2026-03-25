@@ -70,11 +70,13 @@ class _BracketViewState extends State<BracketView> {
     }
   }
 
-  Future<void> _loadBracketData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  Future<void> _loadBracketData({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final tournamentId = widget.tournament.id;
@@ -551,13 +553,31 @@ class _BracketViewState extends State<BracketView> {
         builder: (context, setDialogState) {
           Future<void> updateScore(String teamId, int newScore) async {
             if (_authToken == null) return;
+            
+            // OPTIMISTE : Mise à jour locale immédiate pour réactivité maximale
+            setState(() {
+              final idx = _allMatches.indexWhere((m) => m.id == match.id);
+              if (idx != -1) {
+                final old = _allMatches[idx];
+                _allMatches[idx] = MatchDTO(
+                  id: old.id,
+                  team1Id: old.team1Id,
+                  team2Id: old.team2Id,
+                  team1Point: teamId == old.team1Id ? newScore : old.team1Point,
+                  team2Point: teamId == old.team2Id ? newScore : old.team2Point,
+                  status: old.status,
+                );
+              }
+              if (teamId == match.team1Id) s1 = newScore; else s2 = newScore;
+            });
+
             if (dialogMounted) setDialogState(() => isSaving = true);
             try {
               await _matchApiService.updateMatchPoints(widget.tournament.id, match.id, teamId, newScore, _authToken!);
-              if (teamId == match.team1Id) s1 = newScore; else s2 = newScore;
-              await _loadBracketData();
+              // Silent refresh pour synchroniser proprement sans clignotement
+              if (mounted) await _loadBracketData(silent: true);
             } catch (e) {
-              if (!mounted) return;
+              if (!mounted || !context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Erreur: $e'), backgroundColor: Colors.red));
             } finally {
               if (dialogMounted) setDialogState(() => isSaving = false);
@@ -569,7 +589,6 @@ class _BracketViewState extends State<BracketView> {
             if (dialogMounted) setDialogState(() => isSaving = true);
             try {
               if (status == 'FINISHED') {
-                // Use the repository method for automated advancement
                 await _tournamentApiService.completeMatch(
                   widget.tournament.id, 
                   match.id, 
@@ -584,11 +603,12 @@ class _BracketViewState extends State<BracketView> {
               }
               if (!mounted) return;
               currentStatus = status;
-              await _loadBracketData();
-              if (!mounted) return;
+              // Silent refresh pour garder la position sur l'arbre
+              await _loadBracketData(silent: true);
+              if (!mounted || !context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Statut mis à jour')));
             } catch (e) {
-              if (!mounted) return;
+              if (!mounted || !context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Erreur: $e'), backgroundColor: Colors.red));
             } finally {
               if (dialogMounted) setDialogState(() => isSaving = false);

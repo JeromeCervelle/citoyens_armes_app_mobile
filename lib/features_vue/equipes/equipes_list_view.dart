@@ -26,16 +26,18 @@ class _EquipesListViewState extends State<EquipesListView> {
     _loadEquipes();
   }
 
-  Future<void> _loadEquipes() async {
-    setState(() => _isLoadingEquipes = true);
+    Future<void> _loadEquipes() async {
+    if (mounted) setState(() => _isLoadingEquipes = true);
     try {
       final equipes = await _equipeController.getEquipes(widget.tournament.id);
-      setState(() {
-        _equipes = equipes;
-        _isLoadingEquipes = false;
-      });
+      if (mounted) {
+        setState(() {
+          _equipes = equipes;
+          _isLoadingEquipes = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoadingEquipes = false);
+      if (mounted) setState(() => _isLoadingEquipes = false);
       _showError('Erreur chargement équipes: $e');
     }
   }

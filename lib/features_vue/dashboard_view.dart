@@ -252,19 +252,24 @@ class _DashboardViewState extends State<DashboardView> with RouteAware {
 
                     const SizedBox(height: 30),
 
-                    // Section Super Admin
-                    if (_currentUser?.isSuperAdmin == true) ...[
-                      const Text("SUPER ADMINISTRATION", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF00FF85), letterSpacing: 1.2)),
+                    // Section Administration (Accessible par tous les admins)
+                    if (_currentUser?.isAdmin == true || _currentUser?.isSuperAdmin == true) ...[
+                      Text(
+                        _currentUser?.isSuperAdmin == true ? "SUPER ADMINISTRATION" : "MON PROFIL",
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF00FF85), letterSpacing: 1.2),
+                      ),
                       const SizedBox(height: 15),
                       GestureDetector(
                         onTap: () {
                           Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminListView()));
                         },
-                        child: const GlassCard(
-                          icon: Icons.group_outlined,
-                          title: "Gestion des admins",
-                          subtitle: "Gérer, créer ou supprimer des modérateurs.",
-                          accentColor: Color(0xFF00FF85),
+                        child: GlassCard(
+                          icon: _currentUser?.isSuperAdmin == true ? Icons.group_outlined : Icons.person_outline,
+                          title: _currentUser?.isSuperAdmin == true ? "Gestion des admins" : "Gérer mon compte",
+                          subtitle: _currentUser?.isSuperAdmin == true 
+                            ? "Gérer, créer ou supprimer des modérateurs." 
+                            : "Modifier votre nom, email ou mot de passe.",
+                          accentColor: const Color(0xFF00FF85),
                         ),
                       ),
                       const SizedBox(height: 30),

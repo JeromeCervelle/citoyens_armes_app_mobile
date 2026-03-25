@@ -415,39 +415,84 @@ class TournamentApiService {
 
     // Avancement automatique si terminé
     if (status == 'FINISHED') {
-      await advanceTournament(tournamentId, token);
+      // OPTIMISATION : On passe le roundId pour démarrer l'avancement au bon endroit
+      await advanceTournament(tournamentId, token, startingRoundId: roundId);
     }
   }
 
-  Future<void> advanceTournament(String tournamentId, String token) async {
+  Future<void> advanceTournament(
+    String tournamentId,
+    String token, {
+    String? startingRoundId,
+  }) async {
     try {
-      final rounds = await RoundService().getRounds(tournamentId);
-      final teams = await EquipeController().getEquipes(tournamentId);
+      // OPTIMISATION : Lancer toutes les récupérations initiales en parallèle pour gagner 1-2 secondes
+      final results = await Future.wait([
+        RoundService().getRounds(tournamentId, token: token),
+        EquipeController().getEquipes(tournamentId),
+        _matchService.getMatches(tournamentId),
+      ]);
+
+      final rounds = results[0] as List<Round>;
+      final teams = results[1] as List<Equipe>;
+      var allMatches = results[2] as List<dynamic>;
+
       final byeIds = teams
           .where((t) => t.name.toUpperCase().contains("EXEMPT"))
           .map((t) => t.id!)
           .toSet();
-      var allMatches = await _matchService.getMatches(tournamentId);
 
-      for (int i = 0; i < rounds.length; i++) {
+      // Indexation initiale pour des recherches en O(1) au lieu de O(N)
+      Map<String, dynamic> matchesById = {
+        for (var m in allMatches) (m.id ?? ''): m
+      };
+
+      // Déterminer l'index de départ pour ne pas re-scanner les rounds déjà terminés
+      int startIdx = 0;
+      if (startingRoundId != null) {
+        startIdx = rounds.indexWhere((r) => r.id == startingRoundId);
+        if (startIdx == -1) startIdx = 0;
+      }
+
+      for (int i = startIdx; i < rounds.length; i++) {
         final round = rounds[i];
-        final matches = allMatches
-            .where((m) => round.matchIds.contains(m.id))
+
+        // OPTIMISATION : Accès direct via l'index au lieu d'un .where() sur toute la liste
+        final matches = round.matchIds
+            .map((id) => matchesById[id])
+            .where((m) => m != null)
             .toList();
 
         // Check if round needs to expand its BO series
-        final roundResult = await _isRoundFinished(tournamentId, round, matches, token, byeIds);
+        final roundResult = await _isRoundFinished(
+          tournamentId,
+          round,
+          matches,
+          token,
+          byeIds,
+        );
+
         if (roundResult.hasChanged) {
           allMatches = await _matchService.getMatches(tournamentId);
+          matchesById = {for (var m in allMatches) (m.id ?? ''): m};
         }
 
-        // Stream Advancement: Try to push winners to the next round immediately
+        // Stream Advancement
         if (round.name.startsWith('Poule')) {
           if (roundResult.isFinished) {
             bool allPoolsDone = true;
             for (var r in rounds.where((r) => r.name.startsWith('Poule'))) {
-              final prMatches = allMatches.where((m) => r.matchIds.contains(m.id)).toList();
-              final prResult = await _isRoundFinished(tournamentId, r, prMatches, token, byeIds);
+              final prMatches = r.matchIds
+                  .map((id) => matchesById[id])
+                  .where((m) => m != null)
+                  .toList();
+              final prResult = await _isRoundFinished(
+                tournamentId,
+                r,
+                prMatches,
+                token,
+                byeIds,
+              );
               if (!prResult.isFinished) {
                 allPoolsDone = false;
                 break;
@@ -460,8 +505,8 @@ class TournamentApiService {
                 allMatches,
                 token,
               );
-              // Refresh matches after seeding bracket from pools
               allMatches = await _matchService.getMatches(tournamentId);
+              matchesById = {for (var m in allMatches) (m.id ?? ''): m};
             }
           }
         } else if (i + 1 < rounds.length) {
@@ -472,10 +517,12 @@ class TournamentApiService {
             allMatches,
             token,
             byeIds,
+            matchesById: matchesById, // Passer l'index pour booster les perfs
           );
-          // OPTIMISATION : On ne recharge les matchs que si un vainqueur a été poussé
+
           if (advanced) {
             allMatches = await _matchService.getMatches(tournamentId);
+            matchesById = {for (var m in allMatches) (m.id ?? ''): m};
           }
         }
       }
@@ -697,6 +744,8 @@ class TournamentApiService {
         .where((m) => m.id != null)
         .toList();
 
+    final List<Future Function()> seedingTasks = [];
+
     for (int i = 0; i < nextRound.matchIds.length; i++) {
       int t1Idx = i * 2;
       int t2Idx = i * 2 + 1;
@@ -716,36 +765,42 @@ class TournamentApiService {
       String t1 = reorderedIds[t1Idx];
       String t2 = reorderedIds[t2Idx];
 
-      await _matchService.registerTeamsToMatch(
-        tournamentId,
-        nextRound.matchIds[i],
-        t1,
-        t2,
-        token,
-      );
-
-      final t1Name = allTeams.firstWhere((t) => t.id == t1).name;
-      final t2Name = allTeams.firstWhere((t) => t.id == t2).name;
-
-      bool isExemption1 = t1Name.toUpperCase().contains('EXEMPT');
-      bool isExemption2 = t2Name.toUpperCase().contains('EXEMPT');
-
-      if (isExemption1 || isExemption2) {
-        String winnerId = isExemption1 ? t2 : t1;
-        await _matchService.updateMatchPoints(
+      seedingTasks.add(() async {
+        await _matchService.registerTeamsToMatch(
           tournamentId,
           nextRound.matchIds[i],
-          winnerId,
-          1,
+          t1,
+          t2,
           token,
         );
-        await _matchService.updateMatchStatus(
-          tournamentId,
-          nextRound.matchIds[i],
-          'FINISHED',
-          token,
-        );
-      }
+
+        final t1Name = allTeams.firstWhere((t) => t.id == t1).name;
+        final t2Name = allTeams.firstWhere((t) => t.id == t2).name;
+
+        bool isExemption1 = t1Name.toUpperCase().contains('EXEMPT');
+        bool isExemption2 = t2Name.toUpperCase().contains('EXEMPT');
+
+        if (isExemption1 || isExemption2) {
+          String winnerId = isExemption1 ? t2 : t1;
+          await _matchService.updateMatchPoints(
+            tournamentId,
+            nextRound.matchIds[i],
+            winnerId,
+            1,
+            token,
+          );
+          await _matchService.updateMatchStatus(
+            tournamentId,
+            nextRound.matchIds[i],
+            'FINISHED',
+            token,
+          );
+        }
+      });
+    }
+
+    if (seedingTasks.isNotEmpty) {
+      await _chunkedFutureWait(seedingTasks, chunkSize: 10);
     }
   }
 
@@ -787,10 +842,17 @@ class TournamentApiService {
     Round next,
     List<dynamic> all,
     String token,
-    Set<String> byeIds,
-  ) async {
+    Set<String> byeIds, {
+    Map<String, dynamic>? matchesById,
+  }) async {
     bool hasChanged = false;
     final List<Future Function()> registrationTasks = [];
+
+    // OPTIMISATION : Si on a un index, on évite les scans de liste
+    final matchesInRound = curr.matchIds
+        .map((id) => matchesById?[id] ?? _findMatchById(all, id))
+        .where((m) => m != null)
+        .toList();
 
     try {
       for (int i = 0; i < next.matchIds.length; i++) {
@@ -798,23 +860,37 @@ class TournamentApiService {
         final pos2 = 2 * i + 1;
         if (pos2 >= curr.matchIds.length) break;
 
-        final m1 = _findMatchById(all, curr.matchIds[pos1]);
-        final m2 = _findMatchById(all, curr.matchIds[pos2]);
+        final m1 = pos1 < matchesInRound.length ? matchesInRound[pos1] : null;
+        final m2 = pos2 < matchesInRound.length ? matchesInRound[pos2] : null;
 
         if (m1 == null || m2 == null) break;
 
-        String w1 = _getSeriesWinner(m1, all, curr, byeIds);
-        String w2 = _getSeriesWinner(m2, all, curr, byeIds);
+        String w1 = _getSeriesWinner(
+          m1,
+          all,
+          curr,
+          byeIds,
+          matchesInRound: matchesInRound, // Booster le calcul du vainqueur
+        );
+        String w2 = _getSeriesWinner(
+          m2,
+          all,
+          curr,
+          byeIds,
+          matchesInRound: matchesInRound,
+        );
 
         if (w1.isNotEmpty && w2.isNotEmpty) {
-          final nextMatch = _findMatchById(all, next.matchIds[i]);
+          final nextMatch = matchesById != null
+              ? matchesById[next.matchIds[i]]
+              : _findMatchById(all, next.matchIds[i]);
+
           if (nextMatch != null &&
               nextMatch.team1Id.isNotEmpty &&
               nextMatch.team2Id.isNotEmpty) {
             continue;
           }
 
-          // Préparer la tâche d'inscription pour exécution parallèle
           registrationTasks.add(() async {
             try {
               await _matchService.registerTeamsToMatch(
@@ -833,7 +909,6 @@ class TournamentApiService {
       }
 
       if (registrationTasks.isNotEmpty) {
-        // Exécuter toutes les inscriptions du round en parallèle (par chunks de 10)
         await _chunkedFutureWait(registrationTasks, chunkSize: 10);
       }
     } catch (e) {
@@ -853,19 +928,20 @@ class TournamentApiService {
     dynamic baseMatch,
     List<dynamic> allMatches,
     Round round,
-    Set<String> byeIds,
-  ) {
+    Set<String> byeIds, {
+    List<dynamic>? matchesInRound,
+  }) {
     if (baseMatch == null) return "";
     final t1 = baseMatch.team1Id;
     final t2 = baseMatch.team2Id;
     if (t1.isEmpty || t2.isEmpty) return "";
 
-    // ESSENTIEL : On ne se limite pas à round.matchIds car le backend peut avoir du retard
-    // sur la mise à jour de la liste des IDs du round. On cherche par équipes.
-    final series = allMatches
+    // OPTIMISATION : Utiliser la sous-liste du round si disponible pour éviter de rescanner tout le tournoi
+    final source = matchesInRound ?? allMatches;
+    final series = source
         .where(
           (m) =>
-              round.matchIds.contains(m.id) &&
+              (matchesInRound != null || round.matchIds.contains(m.id)) &&
               ((m.team1Id == t1 && m.team2Id == t2) ||
                   (m.team1Id == t2 && m.team2Id == t1)),
         )
