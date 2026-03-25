@@ -10,19 +10,18 @@ import 'Model/round.dart';
 class RoundService {
   /// URL de base de l'API, lue depuis .env (variable API_URL).
   final String baseUrl;
-  final String? authToken;
 
   /// Client HTTP — injectable pour les tests (MockClient), sinon client par défaut.
   final http.Client _client;
 
-  RoundService({String? baseUrl, this.authToken, http.Client? client})
+  RoundService({String? baseUrl, http.Client? client})
     : baseUrl = baseUrl ?? dotenv.env['API_URL'] ?? 'http://localhost:8080/api',
       _client = client ?? http.Client();
 
   /// En-têtes communs à toutes les requêtes.
-  Map<String, String> get _headers => {
+  Map<String, String> _getHeaders([String? token]) => {
     'Content-Type': 'application/json',
-    if (authToken != null) 'Authorization': 'Bearer $authToken',
+    if (token != null) 'Authorization': 'Bearer $token',
   };
 
   /// Construit l'URL pour les manches d'un tournoi donné.
@@ -41,14 +40,14 @@ class RoundService {
   /// Récupère la liste de toutes les manches d'un tournoi.
   ///
   /// [tournamentId] : identifiant du tournoi.
+  /// [token]        : jeton d'authentification optionnel.
   ///
   /// Retourne une liste de [Round].
   /// Lève une [Exception] si la requête échoue.
-  Future<List<Round>> getRounds(String tournamentId) async {
-    final response = await _client.get(
-      _roundsUri(tournamentId),
-      headers: _headers,
-    );
+  Future<List<Round>> getRounds(String tournamentId, {String? token}) async {
+    final response = await _client
+        .get(_roundsUri(tournamentId), headers: _getHeaders(token))
+        .timeout(const Duration(seconds: 5));
 
     if (response.statusCode == 200) {
       final List<dynamic> body = jsonDecode(response.body) as List<dynamic>;
@@ -71,14 +70,18 @@ class RoundService {
   ///
   /// [tournamentId] : identifiant du tournoi.
   /// [roundId]      : identifiant de la manche.
+  /// [token]        : jeton d'authentification optionnel.
   ///
   /// Retourne le [Round] correspondant.
   /// Lève une [Exception] si la requête échoue.
-  Future<Round> getRound(String tournamentId, String roundId) async {
-    final response = await _client.get(
-      _roundsUri(tournamentId, roundId),
-      headers: _headers,
-    );
+  Future<Round> getRound(
+    String tournamentId,
+    String roundId, {
+    String? token,
+  }) async {
+    final response = await _client
+        .get(_roundsUri(tournamentId, roundId), headers: _getHeaders(token))
+        .timeout(const Duration(seconds: 5));
 
     if (response.statusCode == 200) {
       return Round.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
@@ -101,14 +104,23 @@ class RoundService {
   ///
   /// Retourne le [Round] créé.
   /// Lève une [Exception] si la requête échoue.
-  Future<Round> createRound(String tournamentId, String name) async {
-    final body = jsonEncode({'name': name});
+  /// [tournamentId] : identifiant du tournoi.
+  /// [name]         : nom de la manche (ex. "Quarts de finale").
+  /// [format]       : format du match (ex. 1 pour BO1, 3 pour BO3, 5 pour BO5).
+  ///
+  /// Retourne le [Round] créé.
+  /// Lève une [Exception] si la requête échoue.
+  Future<Round> createRound(
+    String tournamentId,
+    String name,
+    int format,
+    String token,
+  ) async {
+    final body = jsonEncode({'name': name, 'format': format});
 
-    final response = await _client.post(
-      _roundsUri(tournamentId),
-      headers: _headers,
-      body: body,
-    );
+    final response = await _client
+        .post(_roundsUri(tournamentId), headers: _getHeaders(token), body: body)
+        .timeout(const Duration(seconds: 5));
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       return Round.fromJson(jsonDecode(response.body) as Map<String, dynamic>);

@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 import 'Tournois/repository_tournois.dart';
-import 'Tournois/view_tournois_list.dart';
+import 'match/services/match_api_service.dart';
+import 'features_vue/dashboard_view.dart';
+
+import 'Rounds/round_service.dart';
+
+final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,14 +23,21 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         Provider<TournamentApiService>(create: (_) => TournamentApiService()),
+        Provider<MatchApiService>(create: (_) => MatchApiService()),
+
+        Provider<RoundService>(create: (_) => RoundService()),
       ],
       child: MaterialApp(
         title: 'Citoyens Armes',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-          useMaterial3: true,
+        theme: ThemeData.dark().copyWith(
+          scaffoldBackgroundColor: const Color(0xFF050B18),
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF00FF85),
+            primary: const Color(0xFF00FF85),
+          ),
         ),
-        home: const TournamentListScreen(),
+        home: const DashboardView(),
+        navigatorObservers: [routeObserver],
         debugShowCheckedModeBanner: false,
       ),
     );
