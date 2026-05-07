@@ -1,6 +1,13 @@
-# citoyens_armes_app_mobile
+# Citoyens Armés - Application Mobile
 
-A vos claviers citoyens
+> [!NOTE]
+> **Dépôt Privé.** Une présentation détaillée du projet est disponible dans le fichier [project_detail.html](./project_detail.html).
+
+## Présentation
+Application mobile spécialisée dans la **génération d'arbres de compétition** (brackets) et la **gestion de poules** pour le E-Sport, conçue avec **Flutter (Dart)**. Elle permet d'organiser et de structurer les phases de tournois de manière dynamique.
+
+## Pourquoi n'est-il pas sur GitHub ?
+Le développement de cette application implique des configurations sensibles et des ressources propriétaires. Pour consulter le détail technique ou obtenir une démonstration, merci de me contacter directement.
 
 ## Getting Started
 
